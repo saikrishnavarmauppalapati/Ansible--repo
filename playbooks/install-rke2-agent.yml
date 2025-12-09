@@ -4,35 +4,31 @@
   become: yes
 
   tasks:
-
     - name: Create RKE2 config directory
       file:
         path: /etc/rancher/rke2
         state: directory
       tags: [rke2, agent, setup]
 
-    # -----------------------------------
-    # Load token saved from server play
-    # -----------------------------------
-    - name: Load RKE2 token from control node
+    # -------------------------
+    # Load token from Jenkins workspace
+    # -------------------------
+    - name: Load RKE2 token from Jenkins workspace
       slurp:
-        src: /tmp/rke2_token.txt
+        src: "{{ lookup('env','WORKSPACE') }}/rke2_token.txt"
+      register: agent_token_data
       delegate_to: localhost
-      register: token_file
+      become: no
       tags: [rke2, agent, token]
 
-    - name: Decode token
+    - name: Decode RKE2 token
       set_fact:
-        rke2_token: "{{ token_file.content | b64decode | trim }}"
+        rke2_token: "{{ agent_token_data.content | b64decode | trim }}"
       tags: [rke2, agent, token]
 
-    # -----------------------------------
-    # Create agent config with dynamic token
-    # -----------------------------------
     - name: Create RKE2 agent config
       copy:
         dest: /etc/rancher/rke2/config.yaml
-        mode: '0644'
         content: |
           server: https://{{ hostvars['vm1']['ansible_host'] }}:9345
           token: "{{ rke2_token }}"
@@ -49,7 +45,7 @@
       shell: INSTALL_RKE2_TYPE=agent sh /tmp/install.sh
       tags: [rke2, agent, install]
 
-    - name: Enable and start agent
+    - name: Enable and start RKE2 agent
       systemd:
         name: rke2-agent
         enabled: yes
