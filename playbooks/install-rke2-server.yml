@@ -57,14 +57,12 @@
     # -------------------------
     # Save token to local machine (Ansible controller)
     # -------------------------
-    - name: Save token to local controller at /tmp/rke2_token.txt
+    - name: Save RKE2 token inside Jenkins workspace
       copy:
-        dest: /tmp/rke2_token.txt
+        dest: "{{ lookup('env','WORKSPACE') }}/rke2_token.txt"
         content: "{{ rke2_token }}"
       delegate_to: localhost
       become: no
-      tags: [rke2, server, token]
-
     # -------------------------
     # kubeconfig setup
     # -------------------------
