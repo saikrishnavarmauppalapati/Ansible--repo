@@ -9,6 +9,7 @@
         path: /etc/rancher/rke2
         state: directory
         mode: '0755'
+      tags: [rke2, server, setup]
 
     - name: Create RKE2 server configuration file
       copy:
@@ -19,28 +20,30 @@
           advertise-address: "192.168.56.101"
           tls-san:
             - "192.168.56.101"
-
-          # Optional but recommended
           disable-cloud-controller: true
           write-kubeconfig-mode: "0644"
+      tags: [rke2, server, config]
 
     - name: Download RKE2 install script
       get_url:
         url: https://get.rke2.io
         dest: /tmp/install.sh
         mode: '0755'
+      tags: [rke2, server, install]
 
     - name: Install RKE2 server
       shell: INSTALL_RKE2_TYPE=server sh /tmp/install.sh
+      tags: [rke2, server, install]
 
-    - name: Enable and start service
+    - name: Enable and start RKE2 service
       systemd:
         name: rke2-server
         enabled: yes
         state: started
         daemon_reload: yes
+      tags: [rke2, server, service]
 
-     # -------------------------
+    # -------------------------
     # Dynamic token extraction
     # -------------------------
     - name: Read RKE2 server token
@@ -55,7 +58,7 @@
       tags: [rke2, server, token]
 
     # -------------------------
-    # Save token to local machine (Ansible controller)
+    # Save token to Jenkins workspace
     # -------------------------
     - name: Save RKE2 token inside Jenkins workspace
       copy:
@@ -63,6 +66,8 @@
         content: "{{ rke2_token }}"
       delegate_to: localhost
       become: no
+      tags: [rke2, server, token]
+
     # -------------------------
     # kubeconfig setup
     # -------------------------
@@ -70,6 +75,7 @@
       file:
         path: /root/.kube
         state: directory
+        mode: '0700'
       tags: [rke2, server, kube]
 
     - name: Copy kubeconfig
