@@ -40,9 +40,50 @@
         state: started
         daemon_reload: yes
 
-    - name: Copy kubeconfig to default kubectl path
+     # -------------------------
+    # Dynamic token extraction
+    # -------------------------
+    - name: Read RKE2 server token
+      slurp:
+        src: /var/lib/rancher/rke2/server/node-token
+      register: rke2_token_b64
+      tags: [rke2, server, token]
+
+    - name: Decode token and save as fact
+      set_fact:
+        rke2_token: "{{ rke2_token_b64.content | b64decode | trim }}"
+      tags: [rke2, server, token]
+
+    # -------------------------
+    # Save token to local machine (Ansible controller)
+    # -------------------------
+    - name: Save token to control node
+      copy:
+        dest: /tmp/rke2_token.txt
+        content: "{{ rke2_token }}"
+      delegate_to: localhost
+      tags: [rke2, server, token]
+
+    # -------------------------
+    # kubeconfig setup
+    # -------------------------
+    - name: Create kube directory
+      file:
+        path: /root/.kube
+        state: directory
+      tags: [rke2, server, kube]
+
+    - name: Copy kubeconfig
       copy:
         src: /etc/rancher/rke2/rke2.yaml
         dest: /root/.kube/config
         remote_src: yes
         mode: '0600'
+      tags: [rke2, server, kube]
+
+    - name: Symlink kubectl binary
+      file:
+        src: /var/lib/rancher/rke2/bin/kubectl
+        dest: /usr/local/bin/kubectl
+        state: link
+      tags: [rke2, server, kube]
