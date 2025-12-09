@@ -57,11 +57,12 @@
     # -------------------------
     # Save token to local machine (Ansible controller)
     # -------------------------
-    - name: Save token to control node
+    - name: Save token to local controller at /tmp/rke2_token.txt
       copy:
         dest: /tmp/rke2_token.txt
         content: "{{ rke2_token }}"
       delegate_to: localhost
+      become: no
       tags: [rke2, server, token]
 
     # -------------------------
