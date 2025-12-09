@@ -1,0 +1,26 @@
+---
+- name: Install Longhorn using YAML manifest
+  hosts: server
+  become: yes
+
+  vars:
+    kubeconfig_path: /etc/rancher/rke2/rke2.yaml
+    longhorn_manifest: https://github.com/longhorn/longhorn/releases/download/v1.10.0/longhorn.yaml
+
+  tasks:
+
+    - name: Ensure kubectl can access cluster
+      file:
+        path: "{{ kubeconfig_path }}"
+        mode: '0644'
+
+    - name: Install Longhorn from GitHub manifest
+      shell: |
+        export KUBECONFIG={{ kubeconfig_path }}
+        kubectl apply -f {{ longhorn_manifest }}
+
+    - name: Wait for Longhorn UI deployment rollout
+      shell: |
+        export KUBECONFIG={{ kubeconfig_path }}
+        kubectl rollout status -n longhorn-system deploy/longhorn-ui --timeout=300s
+      ignore_errors: yes

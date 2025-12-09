@@ -1,0 +1,48 @@
+---
+- name: Install RKE2 Server
+  hosts: server
+  become: yes
+
+  tasks:
+    - name: Create RKE2 config directory
+      file:
+        path: /etc/rancher/rke2
+        state: directory
+        mode: '0755'
+
+    - name: Create RKE2 server configuration file
+      copy:
+        dest: /etc/rancher/rke2/config.yaml
+        mode: '0644'
+        content: |
+          node-ip: "192.168.56.101"
+          advertise-address: "192.168.56.101"
+          tls-san:
+            - "192.168.56.101"
+
+          # Optional but recommended
+          disable-cloud-controller: true
+          write-kubeconfig-mode: "0644"
+
+    - name: Download RKE2 install script
+      get_url:
+        url: https://get.rke2.io
+        dest: /tmp/install.sh
+        mode: '0755'
+
+    - name: Install RKE2 server
+      shell: INSTALL_RKE2_TYPE=server sh /tmp/install.sh
+
+    - name: Enable and start service
+      systemd:
+        name: rke2-server
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+    - name: Copy kubeconfig to default kubectl path
+      copy:
+        src: /etc/rancher/rke2/rke2.yaml
+        dest: /root/.kube/config
+        remote_src: yes
+        mode: '0600'

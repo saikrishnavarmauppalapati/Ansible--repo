@@ -1,0 +1,78 @@
+---
+- name: Deploy pvc-task app using Podman
+  hosts: server
+  connection: local
+  vars:
+    namespace: userapp
+    docker_image: "docker.io/saikrishnavarma/pvc-task:1.0"   # <-- update this
+    docker_build_context: "/home/vboxuser/pvc-task"
+    manifests_path: "/home/vboxuser/pvc-task"
+    kubeconfig: "{{ lookup('env','KUBECONFIG') | default('~/.kube/config', true) }}"
+
+  tasks:
+
+    - name: Ensure Podman is available
+      command: podman --version
+      register: podman_check
+      changed_when: false
+
+    - name: Build image using Podman
+      command: podman build -t {{ docker_image }} {{ docker_build_context }}
+      args:
+        chdir: "{{ docker_build_context }}"
+
+    - name: "Podman login (important: required for pushing)"
+      command: podman login {{ docker_image.split('/')[0] }}
+      register: podman_login
+      changed_when: false
+      failed_when: false
+      ignore_errors: true
+      # Note: If you are using quay.io or Docker Hub, you will be prompted interactively unless you configure credentials.
+
+    - name: Push image using Podman
+      command: podman push {{ docker_image }}
+
+    - name: Create namespace if not exists
+      command: kubectl --kubeconfig={{ kubeconfig }} get ns {{ namespace }}
+      register: ns_check
+      failed_when: false
+      changed_when: false
+
+    - name: Create namespace
+      command: kubectl --kubeconfig={{ kubeconfig }} create ns {{ namespace }}
+      when: ns_check.rc != 0
+
+    - name: Apply mysql pvc
+      command: kubectl --kubeconfig={{ kubeconfig }} -n {{ namespace }} apply -f {{ manifests_path }}/mysql-pvc.yaml
+
+    - name: Apply mysql deployment
+      command: kubectl --kubeconfig={{ kubeconfig }} -n {{ namespace }} apply -f {{ manifests_path }}/mysql-deployment.yaml
+
+    - name: Apply mysql service
+      command: kubectl --kubeconfig={{ kubeconfig }} -n {{ namespace }} apply -f {{ manifests_path }}/mysql-service.yaml
+
+    - name: Wait for MySQL pod to be ready
+      command: kubectl --kubeconfig={{ kubeconfig }} -n {{ namespace }} wait --for=condition=ready pod -l app=mysql --timeout=120s
+      register: wait_mysql
+      failed_when: false
+
+    - name: Apply backend deployment
+      command: kubectl --kubeconfig={{ kubeconfig }} -n {{ namespace }} apply -f {{ manifests_path }}/backend-deployment.yaml
+
+    - name: Apply backend service
+      command: kubectl --kubeconfig={{ kubeconfig }} -n {{ namespace }} apply -f {{ manifests_path }}/backend-service.yaml
+
+    - name: Apply CronJob
+      command: kubectl --kubeconfig={{ kubeconfig }} -n {{ namespace }} apply -f {{ manifests_path }}/cronjob_backup.yaml
+
+    - name: Apply Ingress
+      command: kubectl --kubeconfig={{ kubeconfig }} -n {{ namespace }} apply -f {{ manifests_path }}/userapp-ingress.yaml
+
+    - name: Show resources summary
+      command: kubectl --kubeconfig={{ kubeconfig }} -n {{ namespace }} get all
+      register: resources
+      changed_when: false
+
+    - name: Print resources
+      debug:
+        var: resources.stdout_lines

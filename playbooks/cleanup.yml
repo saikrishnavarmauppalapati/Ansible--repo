@@ -1,0 +1,61 @@
+- name: Cleanup existing RKE2 cluster completely
+  hosts: all
+  become: yes
+  tasks:
+    
+    - name: Stop rke2-server service if exists
+      service:
+        name: rke2-server
+        state: stopped
+      ignore_errors: yes
+
+    - name: Stop rke2-agent service if exists
+      service:
+        name: rke2-agent
+        state: stopped
+      ignore_errors: yes
+
+    - name: Run rke2-uninstall.sh if exists
+      command: /usr/local/bin/rke2-uninstall.sh
+      ignore_errors: yes
+
+    - name: Run rke2-agent-uninstall.sh if exists
+      command: /usr/local/bin/rke2-agent-uninstall.sh
+      ignore_errors: yes
+
+    - name: Remove Kubernetes and RKE2 directories
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/rancher
+        - /var/lib/rancher
+        - /var/lib/kubelet
+        - /var/lib/etcd
+        - /var/lib/cni
+        - /etc/cni
+        - /run/k3s
+      ignore_errors: yes
+
+    - name: Remove RKE2 binaries
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /usr/local/bin/rke2
+        - /usr/local/bin/kubectl
+        - /usr/local/bin/crictl
+        - /usr/local/bin/ctr
+        - /usr/local/bin/rke2-uninstall.sh
+        - /usr/local/bin/rke2-agent-uninstall.sh
+      ignore_errors: yes
+
+    - name: Clean Longhorn data folders if any
+      file:
+        path: "/var/lib/longhorn"
+        state: absent
+      ignore_errors: yes
+
+    - name: Clean iptables
+      command: iptables -F
+      ignore_errors: yes

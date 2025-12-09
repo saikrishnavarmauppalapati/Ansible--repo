@@ -1,0 +1,23 @@
+---
+- name: Install NFS Client StorageClass
+  hosts: server
+  become: yes
+
+  vars:
+    nfs_server: "192.168.56.101"          # Your NFS VM IP
+    nfs_path: "/srv/nfs"               # Your export directory
+
+  tasks:
+    - name: Add Helm repo
+      shell: |
+        export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
+        helm repo add nfs-subdir-external-provisioner https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/
+        helm repo update
+
+    - name: Install NFS Provisioner
+      shell: |
+        export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
+        helm install nfs-client nfs-subdir-external-provisioner/nfs-subdir-external-provisioner \
+          --set nfs.server={{ nfs_server }} \
+          --set nfs.path={{ nfs_path }} \
+          -n nfs-storage --create-namespace
